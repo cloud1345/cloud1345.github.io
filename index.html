@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN">
+<head>
+<meta content="default-src 'none'; style-src * 'unsafe-inline'; script-src * 'unsafe-inline'; img-src * data: blob:; font-src * data:; media-src * data: blob:; connect-src 'none'; form-action 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'" http-equiv="Content-Security-Policy"/>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>家庭云相册</title>
+<!-- Tailwind CSS -->
+<script src="https://image.uc.cn/s/uae/g/3n/mos-production/0915/3.4.17.js"></script>
+<!-- Font Awesome -->
+<script src="https://image.uc.cn/s/uae/g/3n/mos-production/fontawesome-free-7.1.0-web/js/all.min.js"></script>
+<link href="https://image.uc.cn/s/uae/g/3n/mos-production/fontawesome-free-7.1.0-web/css/fontawesome.min.css" rel="stylesheet"/>
+<style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+
+        /* Toast Animation */
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+        .toast-enter {
+            animation: slideIn 0.3s ease-out forwards;
+        }
+        .toast-exit {
+            animation: fadeOut 0.3s ease-out forwards;
+        }
+
+        /* Loader */
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 3px solid #3b82f6;
+            width: 20px;
+            height: 20px;
+            -webkit-animation: spin 1s linear infinite; /* Safari */
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Hide elements visually but keep accessible */
+        .hidden-visually {
+            display: none !important;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans h-screen flex flex-col overflow-hidden">
+<!-- Toast Container -->
+<div class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none" id="toast-container"></div>
+<!-- Modal Container -->
+<div class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden flex items-center justify-center p-4 backdrop-blur-sm" id="modal-overlay">
+<div class="bg-white rounded-lg shadow-xl max-w-md w-full p-6 transform transition-all scale-100" id="modal-content">
+<!-- Dynamic Content -->
+</div>
+</div>
+<!-- Auth View -->
+<div class="flex-1 flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4" id="auth-view">
+<div class="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
+<div class="text-center mb-8">
+<img alt="Logo" class="w-20 h-20 mx-auto rounded-full object-cover shadow-md mb-4" src="https://agent.qianwen.com/mos/0e1bd9ce260d4ceaa4d32e23a655ab30/2f53cb00c70d745ff12ec52316e12eca"/>
+<h1 class="text-2xl font-bold text-gray-800">家庭云相册</h1>
+<p class="text-gray-500 text-sm mt-1">记录家庭美好瞬间</p>
+</div>
+<!-- Login Form -->
+<div id="login-form">
+<div class="mb-4">
+<label class="block text-gray-700 text-sm font-bold mb-2">姓名</label>
+<input class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition" id="login-username" placeholder="请输入姓名" type="text"/>
+</div>
+<div class="mb-6">
+<label class="block text-gray-700 text-sm font-bold mb-2">密码</label>
+<input class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition" id="login-password" placeholder="请输入密码" type="password"/>
+</div>
+<div class="mb-6 flex items-center">
+<input class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500" id="remember-me" type="checkbox"/>
+<label class="ml-2 text-sm font-medium text-gray-900" for="remember-me">记住我</label>
+</div>
+<button class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200 shadow-md" onclick="app.login()">
+                    登录
+                </button>
+<div class="mt-4 text-center">
+<span class="text-sm text-gray-600">还没有账号？</span>
+<a class="text-sm text-blue-600 hover:underline font-medium" href="#" onclick="app.toggleAuth('register')">立即注册</a>
+</div>
+</div>
+<!-- Register Form -->
+<div class="hidden" id="register-form">
+<div class="mb-4">
+<label class="block text-gray-700 text-sm font-bold mb-2">姓名</label>
+<input class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition" id="reg-username" placeholder="请输入姓名" type="text"/>
+</div>
+<div class="mb-6">
+<label class="block text-gray-700 text-sm font-bold mb-2">密码</label>
+<input class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition" id="reg-password" placeholder="设置密码" type="password"/>
+</div>
+<button class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200 shadow-md" onclick="app.register()">
+                    注册
+                </button>
+<div class="mt-4 text-center">
+<span class="text-sm text-gray-600">已有账号？</span>
+<a class="text-sm text-blue-600 hover:underline font-medium" href="#" onclick="app.toggleAuth('login')">返回登录</a>
+</div>
+</div>
+</div>
+</div>
+<!-- Main View -->
+<div class="hidden flex-1 flex flex-col h-screen overflow-hidden" id="main-view">
+<!-- Navigation -->
+<nav class="bg-white shadow-md z-30 flex-shrink-0">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="flex justify-between h-16">
+<div class="flex items-center">
+<img alt="Logo" class="h-8 w-8 rounded-full mr-2" src="https://agent.qianwen.com/mos/0e1bd9ce260d4ceaa4d32e23a655ab30/2f53cb00c70d745ff12ec52316e12eca"/>
+<span class="font-bold text-xl text-gray-800 hidden sm:block">家庭云相册</span>
+</div>
+<!-- Desktop Menu -->
+<div class="hidden sm:flex sm:items-center sm:space-x-4">
+<button class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 transition" data-target="dashboard" onclick="app.navTo('dashboard')">仪表盘</button>
+<button class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 transition" data-target="album" onclick="app.navTo('album')">我的相册</button>
+<button class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 transition" data-target="public" onclick="app.navTo('public')">公共相册</button>
+<button class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 transition" data-target="settings" onclick="app.navTo('settings')">设置</button>
+</div>
+<!-- User Profile -->
+<div class="flex items-center">
+<div class="relative group">
+<button class="flex items-center max-w-xs text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" id="user-menu-button">
+<img alt="" class="h-8 w-8 rounded-full object-cover border border-gray-200" id="nav-avatar" src=""/>
+<span class="ml-2 text-gray-700 font-medium hidden sm:block" id="nav-username"></span>
+<i class="fas fa-chevron-down ml-1 text-gray-400 text-xs hidden sm:block"></i>
+</button>
+</div>
+<!-- Mobile Menu Button -->
+<div class="ml-3 flex items-center sm:hidden">
+<button class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none" onclick="app.toggleMobileMenu()">
+<i class="fas fa-bars text-xl"></i>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Mobile Menu -->
+<div class="hidden sm:hidden bg-white border-t border-gray-200" id="mobile-menu">
+<div class="px-2 pt-2 pb-3 space-y-1">
+<button class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50" onclick="app.navTo('dashboard')">仪表盘</button>
+<button class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50" onclick="app.navTo('album')">我的相册</button>
+<button class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50" onclick="app.navTo('public')">公共相册</button>
+<button class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50" onclick="app.navTo('settings')">设置</button>
+</div>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 overflow-y-auto bg-gray-50 p-4 sm:p-6 relative" id="content-area">
+<!-- Content injected here via JS -->
+</main>
+<!-- Footer -->
+<footer class="bg-white border-t border-gray-200 flex-shrink-0 py-3 z-20">
+<div class="max-w-7xl mx-auto px-4 text-center">
+<p class="text-xs text-gray-500">祁明阳管理本网站</p>
+<p class="text-xs text-gray-500">家庭云相册 © 版权所有</p>
+<p class="text-xs text-gray-500">由豆包辅助代码飞书提供上线</p>
+</div>
+</footer>
+</div>
+<!-- JavaScript Application Logic -->
+<script>
+        /**
+         * Application Logic
+         * Handles state, storage, UI rendering, and interactions.
+         */
+        const app = {
+            // State
+            currentUser: null,
+            currentView: 'dashboard',
+            currentFolderId: 'all', // 'all' or specific folder ID
+            isEditMode: false,
+            selectedPhotos: new Set(),
+            users: [],
+            publicPhotos: [],
+            userData: { folders: [], photos: [] },
+
+            // Constants
+            STORAGE_KEYS: {
+                USERS: 'fc_users',
+                CURRENT_USER: 'fc_current_user',
+                PUBLIC_PHOTOS: 'fc_public_photos',
+                USER_DATA_PREFIX: 'fc_user_data_'
+            },
+
+            /**
+             * Initialize Application
+             */
+            init: function() {
+                this.loadFromStorage();
+                this.checkSession();
+                this.setupEventListeners();
+            },
+
+            /**
+             * Storage Helpers
+             */
+            loadFromStorage: function() {
+                // Load users list
+                const usersStr = localStorage.getItem(this.STORAGE_KEYS.USERS);
+                this.users = usersStr ? JSON.parse(usersStr) : [];
+
+                // Load public photos
+                const publicStr = localStorage.getItem(this.STORAGE_KEYS.PUBLIC_PHOTOS);
+                this.publicPhotos = publicStr ? JSON.parse(publicStr) : [];
+            },
+
+            saveUsers: function() {
+                localStorage.setItem(this.STORAGE_KEYS.USERS, JSON.stringify(this.users));
+            },
+
+            savePublicPhotos: function() {
+                localStorage.setItem(this.STORAGE_KEYS.PUBLIC_PHOTOS, JSON.stringify(this.publicPhotos));
+            },
+
+            loadUserData: function(username) {
+                const dataStr = localStorage.getItem(this.STORAGE_KEYS.USER_DATA_PREFIX + username);
+                if (dataStr) {
+                    this.userData = JSON.parse(dataStr);
+                } else {
+                    // Initialize empty structure for new user
+                    this.userData = { folders: [], photos: [] };
+                }
+            },
+
+            saveUserData: function() {
+                if (!this.currentUser) return;
+                localStorage.setItem(this.STORAGE_KEYS.USER_DATA_PREFIX + this.currentUser.username, JSON.stringify(this.userData));
+            },
+
+            /**
+             * Authentication
+             */
+            checkSession: function() {
+                const sessionUser = localStorage.getItem(this.STORAGE_KEYS.CURRENT_USER);
+                if (sessionUser) {
+                    const user = this.users.find(u => u.username === sessionUser);
+                    if (user) {
+                        this.currentUser = user;
+                        this.loadUserData(user.username);
+                        this.showMainView();
+                        return;
+                    }
+                }
+                this.showAuthView();
+            },
+
+            login: function() {
+                const usernameInput = document.getElementById('login-username');
+                const passwordInput = document.getElementById('login-password');
+                const rememberMe = document.getElementById('remember-me').checked;
+
+                const username = usernameInput.value.trim();
+                const password = passwordInput.value.trim();
+
+                if (!username || !password) {
+                    this.toast('请输入姓名和密码', 'error');
+                    return;
+                }
+
+                const user = this.users.find(u => u.username === username && u.password === password);
+
+                if (user) {
+                    this.currentUser = user;
+                    this.loadUserData(username);
+                    
+                    if (rememberMe) {
+                        localStorage.setItem(this.STORAGE_KEYS.CURRENT_USER, username);
+                    } else {
+                        sessionStorage.setItem(this.STORAGE_KEYS.CURRENT_USER, username); // Use session for non-remembered
+                    }
+                    
+                    this.toast('登录成功', 'success');
+                    this.showMainView();
+                } else {
+                    this.toast('用户名或密码错误，或未注册', 'error');
+                }
+            },
+
+            register: function() {
+                const usernameInput = document.getElementById('reg-username');
+                const passwordInput = document.getElementById('reg-password');
+
+                const username = usernameInput.value.trim();
+                const password = passwordInput.value.trim();
+
+                if (!username || !password) {
+                    this.toast('请填写完整信息', 'error');
+                    return;
+                }
+
+                if (this.users.find(u => u.username === username)) {
+                    this.toast('该用户名已被注册', 'error');
+                    return;
+                }
+
+                // Create new user
+                const newUser = {
+                    username: username,
+                    password: password,
+                    avatar: 'https://ui-avatars.com/api/?name=' + encodeURIComponent(username) + '&background=random'
+                };
+
+                this.users.push(newUser);
+                this.saveUsers();
+
+                // Initialize empty data for new user
+                this.userData = { folders: [], photos: [] };
+                this.saveUserData();
+
+                // Auto login
+                this.currentUser = newUser;
+                localStorage.setItem(this.STORAGE_KEYS.CURRENT_USER, username);
+                
+                this.toast('注册成功，已自动登录', 'success');
+                this.showMainView();
+            },
+
+            logout: function() {
+                this.currentUser = null;
+                this.userData = { folders: [], photos: [] };
+                localStorage.removeItem(this.STORAGE_KEYS.CURRENT_USER);
+                sessionStorage.removeItem(this.STORAGE_KEYS.CURRENT_USER);
+                this.showAuthView();
+                this.toast('已退出登录', 'info');
+            },
+
+            switchUser: function() {
+                this.logout();
+            },
+
+            /**
+             * UI Navigation
+             */
+            showAuthView: function() {
+                document.getElementById('auth-view').classList.remove('hidden');
+                document.getElementById('main-view').classList.add('hidden');
+                // Reset forms
+                document.getElementById('login-username').value = '';
+                document.getElementById('login-password').value = '';
+                document.getElementById('reg-username').value = '';
+                document.getElementById('reg-password').value = '';
+            },
+
+            showMainView: function() {
+                document.getElementById('auth-view').classList.add('hidden');
+                document.getElementById('main-view').classList.remove('hidden');
+                
+                // Update Nav Info
+                document.getElementById('nav-username').textContent = this.currentUser.username;
+                document.getElementById('nav-avatar').src = this.currentUser.avatar;
+
+                // Default to dashboard
+                this.navTo('dashboard');
+            },
+
+            toggleAuth: function(mode) {
+                if (mode === 'register') {
+                    document.getElementById('login-form').classList.add('hidden');
+                    document.getElementById('register-form').classList.remove('hidden');
+                } else {
+                    document.getElementById('register-form').classList.add('hidden');
+                    document.getElementById('login-form').classList.remove('hidden');
+                }
+            },
+
+            toggleMobileMenu: function() {
+                const menu = document.getElementById('mobile-menu');
+                menu.classList.toggle('hidden');
+            },
+
+            navTo: function(viewName) {
+                this.currentView = viewName;
+                this.isEditMode = false;
+                this.selectedPhotos.clear();
+                
+                // Update active state in nav
+                document.querySelectorAll('.nav-btn').forEach(btn => {
+                    if(btn.dataset.target === viewName) {
+                        btn.classList.add('text-blue-600', 'bg-blue-50');
+                        btn.classList.remove('text-gray-700');
+                    } else {
+                        btn.classList.remove('text-blue-600', 'bg-blue-50');
+                        btn.classList.add('text-gray-700');
+                    }
+                });
+
+                // Close mobile menu if open
+                document.getElementById('mobile-menu').classList.add('hidden');
+
+                const content = document.getElementById('content-area');
+                content.innerHTML = ''; // Clear current content
+
+                switch(viewName) {
+                    case 'dashboard':
+                        this.renderDashboard(content);
+                        break;
+                    case 'album':
+                        this.renderAlbum(content);
+                        break;
+                    case 'public':
+                        this.renderPublicAlbum(content);
+                        break;
+                    case 'settings':
+                        this.renderSettings(content);
+                        break;
+                }
+            },
+
+            /**
+             * Render Functions
+             */
+            renderDashboard: function(container) {
+                const photoCount = this.userData.photos.length;
+                const folderCount = this.userData.folders.length;
+                const publicCount = this.userData.photos.filter(p => p.isPublic).length;
+
+                container.innerHTML = `
+                    <div class="max-w-4xl mx-auto">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6">个人仪表盘</h2>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition">
+                                <div class="flex items-center">
+                                    <div class="p-3 bg-blue-100 rounded-full text-blue-600 mr-4">
+                                        <i class="fas fa-images text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm text-gray-500">我的照片</p>
+                                        <p class="text-2xl font-bold text-gray-800">${photoCount}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition">
+                                <div class="flex items-center">
+                                    <div class="p-3 bg-green-100 rounded-full text-green-600 mr-4">
+                                        <i class="fas fa-folder text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm text-gray-500">文件夹</p>
+                                        <p class="text-2xl font-bold text-gray-800">${folderCount}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition">
+                                <div class="flex items-center">
+                                    <div class="p-3 bg-purple-100 rounded-full text-purple-600 mr-4">
+                                        <i class="fas fa-globe text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm text-gray-500">已公开</p>
+                                        <p class="text-2xl font-bold text-gray-800">${publicCount}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                            <h3 class="text-lg font-bold text-gray-800 mb-4">快捷入口</h3>
+                            <div class="flex flex-wrap gap-4">
+                                <button onclick="app.navTo('album')" class="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition font-medium">
+                                    <i class="fas fa-upload mr-2"></i>上传照片
+                                </button>
+                                <button onclick="app.navTo('public')" class="px-4 py-2 bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 transition font-medium">
+                                    <i class="fas fa-users mr-2"></i>查看公共相册
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            },
+
+            renderAlbum: function(container) {
+                container.innerHTML = `
+                    <div class="flex flex-col h-full">
+                        <!-- Toolbar -->
+                        <div class="bg-white p-4 rounded-t-xl shadow-sm border-b border-gray-100 flex flex-col sm:flex-row justify-between items-center gap-4 mb-4">
+                            <div class="flex items-center gap-2 w-full sm:w-auto">
+                                <h2 class="text-xl font-bold text-gray-800">我的相册</h2>
+                                <button onclick="app.toggleEditMode()" class="ml-4 px-3 py-1 text-sm border rounded-md ${this.isEditMode ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300'} hover:opacity-90 transition">
+                                    ${this.isEditMode ? '完成编辑' : '管理'}
+                                </button>
+                            </div>
+                            
+                            <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+                                ${this.isEditMode ? `
+                                    <button onclick="app.batchDelete()" class="px-3 py-1.5 text-sm bg-red-50 text-red-600 rounded hover:bg-red-100 transition">
+                                        <i class="fas fa-trash-alt mr-1"></i>删除
+                                    </button>
+                                    <button onclick="app.batchPublic(true)" class="px-3 py-1.5 text-sm bg-green-50 text-green-600 rounded hover:bg-green-100 transition">
+                                        <i class="fas fa-globe mr-1"></i>公开
+                                    </button>
+                                    <button onclick="app.batchPublic(false)" class="px-3 py-1.5 text-sm bg-gray-50 text-gray-600 rounded hover:bg-gray-100 transition">
+                                        <i class="fas fa-lock mr-1"></i>取消公开
+                                    </button>
+                                ` : `
+                                    <button onclick="app.promptCreateFolder()" class="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition">
+                                        <i class="fas fa-folder-plus mr-1"></i>新建文件夹
+                                    </button>
+                                    <label class="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition cursor-pointer shadow-sm">
+                                        <i class="fas fa-cloud-upload-alt mr-1"></i>上传照片
+                                        <input type="file" multiple accept="image/*" class="hidden" onchange="app.handleUpload(this)">
+                                    </label>
+                                `}
+                            </div>
+                        </div>
+
+                        <!-- Layout: Sidebar (Folders) + Grid (Photos) -->
+                        <div class="flex flex-col md:flex-row gap-4 flex-1 overflow-hidden">
+                            <!-- Sidebar -->
+                            <div class="w-full md:w-64 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col overflow-hidden">
+                                <div class="p-4 border-b border-gray-100 font-bold text-gray-700">文件夹</div>
+                                <div class="flex-1 overflow-y-auto p-2" id="folder-list">
+                                    <!-- Folder items injected here -->
+                                </div>
+                            </div>
+
+                            <!-- Photo Grid -->
+                            <div class="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
+                                <div class="p-3 border-b border-gray-100 bg-gray-50 text-sm text-gray-600 flex justify-between items-center">
+                                    <span id="current-folder-title">所有照片</span>
+                                    <span id="photo-count-badge">0 张</span>
+                                </div>
+                                <div class="flex-1 overflow-y-auto p-4 bg-gray-50">
+                                    <div id="photo-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                                        <!-- Photos injected here -->
+                                    </div>
+                                    <div id="empty-state" class="hidden flex flex-col items-center justify-center h-64 text-gray-400">
+                                        <i class="fas fa-camera text-4xl mb-2"></i>
+                                        <p>暂无照片</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                this.renderFolderList();
+                this.renderPhotoGrid();
+            },
+
+            renderFolderList: function() {
+                const listContainer = document.getElementById('folder-list');
+                if (!listContainer) return;
+
+                let html = `
+                    <div onclick="app.switchFolder('all')" class="p-2 rounded-lg cursor-pointer flex items-center justify-between group ${this.currentFolderId === 'all' ? 'bg-blue-50 text-blue-600' : 'hover:bg-gray-100 text-gray-700'}">
+                        <div class="flex items-center">
+                            <i class="fas fa-inbox w-6 text-center mr-2"></i>
+                            <span class="text-sm font-medium">所有照片</span>
+                        </div>
+                        <span class="text-xs bg-gray-200 px-2 py-0.5 rounded-full">${this.userData.photos.length}</span>
+                    </div>
+                `;
+
+                this.userData.folders.forEach(folder => {
+                    const count = this.userData.photos.filter(p => p.folderId === folder.id).length;
+                    html += `
+                        <div onclick="app.switchFolder('${folder.id}')" class="p-2 rounded-lg cursor-pointer flex items-center justify-between group ${this.currentFolderId === folder.id ? 'bg-blue-50 text-blue-600' : 'hover:bg-gray-100 text-gray-700'}">
+                            <div class="flex items-center truncate">
+                                <i class="fas fa-folder w-6 text-center mr-2"></i>
+                                <span class="text-sm font-medium truncate">${folder.name}</span>
+                            </div>
+                            <span class="text-xs bg-gray-200 px-2 py-0.5 rounded-full">${count}</span>
+                        </div>
+                    `;
+                });
+
+                listContainer.innerHTML = html;
+            },
+
+            renderPhotoGrid: function() {
+                const grid = document.getElementById('photo-grid');
+                const emptyState = document.getElementById('empty-state');
+                const countBadge = document.getElementById('photo-count-badge');
+                const folderTitle = document.getElementById('current-folder-title');
+
+                // Filter photos
+                let photos = this.userData.photos;
+                if (this.currentFolderId !== 'all') {
+                    photos = photos.filter(p => p.folderId === this.currentFolderId);
+                    const folder = this.userData.folders.find(f => f.id === this.currentFolderId);
+                    folderTitle.textContent = folder ? folder.name : '未知文件夹';
+                } else {
+                    folderTitle.textContent = '所有照片';
+                }
+
+                countBadge.textContent = `${photos.length} 张`;
+
+                if (photos.length === 0) {
+                    grid.innerHTML = '';
+                    emptyState.classList.remove('hidden');
+                    return;
+                }
+
+                emptyState.classList.add('hidden');
+                
+                grid.innerHTML = photos.map(photo => `
+                    <div class="relative group bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden aspect-square">
+                        <img src="${photo.src}" class="w-full h-full object-cover transition duration-300 group-hover:scale-105" alt="photo">
+                        
+                        <!-- Selection Checkbox (Edit Mode) -->
+                        ${this.isEditMode ? `
+                            <div class="absolute top-2 left-2 z-10">
+                                <input type="checkbox" onchange="app.togglePhotoSelection('${photo.id}')" ${this.selectedPhotos.has(photo.id) ? 'checked' : ''} class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer">
+                            </div>
+                        ` : ''}
+
+                        <!-- Overlay Actions (View Mode) -->
+                        ${!this.isEditMode ? `
+                            <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition duration-300 flex flex-col justify-end p-2 opacity-0 group-hover:opacity-100">
+                                <div class="flex justify-between items-center text-white">
+                                    <button onclick="app.editCaption('${photo.id}')" class="p-1.5 bg-black bg-opacity-50 rounded hover:bg-opacity-70" title="编辑备注">
+                                        <i class="fas fa-pen text-xs"></i>
+                                    </button>
+                                    <button onclick="app.toggleSinglePublic('${photo.id}')" class="p-1.5 bg-black bg-opacity-50 rounded hover:bg-opacity-70" title="${photo.isPublic ? '取消公开' : '公开'}">
+                                        <i class="fas ${photo.isPublic ? 'fa-lock' : 'fa-globe'} text-xs"></i>
+                                    </button>
+                                </div>
+                                ${photo.caption ? `<p class="text-xs text-white truncate mt-1 bg-black bg-opacity-30 rounded px-1">${photo.caption}</p>` : ''}
+                            </div>
+                        ` : ''}
+                        
+                        <!-- Public Indicator -->
+                        ${photo.isPublic ? `
+                            <div class="absolute top-2 right-2 z-10">
+                                <i class="fas fa-globe text-blue-500 drop-shadow-md"></i>
+                            </div>
+                        ` : ''}
+                    </div>
+                `).join('');
+            },
+
+            renderPublicAlbum: function(container) {
+                // Aggregate public photos
+                // We need to scan all users' data because fc_public_photos might not be fully synced in this simple implementation
+                // However, requirements say use fc_public_photos key. Let's trust that key as the source of truth for "Public Album"
+                // But to be safe and ensure sync, we can merge logic.
+                // Let's stick to the requirement: fc_public_photos stores the data.
+                
+                const publicPhotos = this.publicPhotos; // This is a list of photo objects
+
+                container.innerHTML = `
+                    <div class="max-w-6xl mx-auto">
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-2xl font-bold text-gray-800">家庭公共相册</h2>
+                            <span class="text-sm text-gray-500 bg-white px-3 py-1 rounded-full shadow-sm border border-gray-100">
+                                共 ${publicPhotos.length} 张照片
+                            </span>
+                        </div>
+
+                        <div id="public-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                            <!-- Public photos -->
+                        </div>
+                         <div id="public-empty-state" class="hidden flex flex-col items-center justify-center h-64 text-gray-400">
+                            <i class="fas fa-images text-4xl mb-2"></i>
+                            <p>公共相册暂无照片</p>
+                        </div>
+                    </div>
+                `;
+
+                const grid = document.getElementById('public-grid');
+                const emptyState = document.getElementById('public-empty-state');
+
+                if (publicPhotos.length === 0) {
+                    emptyState.classList.remove('hidden');
+                } else {
+                    grid.innerHTML = publicPhotos.map(photo => `
+                        <div class="relative group bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden aspect-square">
+                            <img src="${photo.src}" class="w-full h-full object-cover" alt="public photo">
+                            <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-2 opacity-0 group-hover:opacity-100 transition">
+                                <p class="text-xs text-white truncate">${photo.caption || '无备注'}</p>
+                                <p class="text-[10px] text-gray-300">by ${photo.owner || '未知用户'}</p>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            },
+
+            renderSettings: function(container) {
+                container.innerHTML = `
+                    <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                        <div class="p-6 border-b border-gray-100">
+                            <h2 class="text-xl font-bold text-gray-800">设置</h2>
+                        </div>
+                        
+                        <div class="p-6 space-y-8">
+                            <!-- Avatar Section -->
+                            <div class="flex items-center space-x-4">
+                                <img id="settings-avatar" src="${this.currentUser.avatar}" class="w-20 h-20 rounded-full object-cover border border-gray-200">
+                                <div>
+                                    <h3 class="text-lg font-medium text-gray-900">${this.currentUser.username}</h3>
+                                    <button onclick="document.getElementById('avatar-upload').click()" class="mt-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition">
+                                        更换头像
+                                    </button>
+                                    <input type="file" id="avatar-upload" class="hidden" accept="image/*" onchange="app.handleAvatarChange(this)">
+                                </div>
+                            </div>
+
+                            <hr class="border-gray-100">
+
+                            <!-- Data Sync Section -->
+                            <div>
+                                <h3 class="text-lg font-medium text-gray-900 mb-2">数据同步与备份</h3>
+                                <p class="text-sm text-gray-500 mb-4">导出数据文件，在其他设备导入即可实现跨设备同步。</p>
+                                <div class="flex gap-4">
+                                    <button onclick="app.exportData()" class="flex-1 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition text-sm font-medium">
+                                        <i class="fas fa-download mr-2"></i>导出数据
+                                    </button>
+                                    <label class="flex-1 px-4 py-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition text-sm font-medium text-center cursor-pointer">
+                                        <i class="fas fa-upload mr-2"></i>导入数据
+                                        <input type="file" class="hidden" accept=".json" onchange="app.importData(this)">
+                                    </label>
+                                </div>
+                            </div>
+
+                            <hr class="border-gray-100">
+
+                            <!-- Account Actions -->
+                            <div>
+                                <h3 class="text-lg font-medium text-gray-900 mb-2">账号操作</h3>
+                                <div class="flex flex-col sm:flex-row gap-4">
+                                    <button onclick="app.switchUser()" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition text-sm">
+                                        切换用户
+                                    </button>
+                                    <button onclick="app.logout()" class="px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition text-sm">
+                                        退出登录
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            },
+
+            /**
+             * Logic: Folders & Photos
+             */
+            promptCreateFolder: function() {
+                this.showModal(
+                    '新建文件夹',
+                    `<input type="text" id="new-folder-name" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="文件夹名称">`,
+                    () => {
+                        const name = document.getElementById('new-folder-name').value.trim();
+                        if (name) {
+                            this.userData.folders.push({
+                                id: 'folder_' + Date.now(),
+                                name: name,
+                                parentId: null // Simplified: no subfolders for now based on requirements
+                            });
+                            this.saveUserData();
+                            this.renderFolderList();
+                            this.toast('文件夹创建成功', 'success');
+                            this.closeModal();
+                        } else {
+                            this.toast('文件夹名称不能为空', 'error');
+                        }
+                    }
+                );
+            },
+
+            switchFolder: function(folderId) {
+                this.currentFolderId = folderId;
+                this.renderFolderList();
+                this.renderPhotoGrid();
+            },
+
+            toggleEditMode: function() {
+                this.isEditMode = !this.isEditMode;
+                this.selectedPhotos.clear();
+                this.renderAlbum(document.getElementById('content-area'));
+            },
+
+            togglePhotoSelection: function(photoId) {
+                if (this.selectedPhotos.has(photoId)) {
+                    this.selectedPhotos.delete(photoId);
+                } else {
+                    this.selectedPhotos.add(photoId);
+                }
+            },
+
+            /**
+             * Logic: Upload & Image Processing
+             */
+            handleUpload: function(input) {
+                if (input.files.length === 0) return;
+
+                const files = Array.from(input.files);
+                let processedCount = 0;
+
+                this.toast(`正在处理 ${files.length} 张照片...`, 'info');
+
+                files.forEach(file => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        // Resize image to save storage
+                        this.resizeImage(e.target.result, 800, (dataUrl) => {
+                            const newPhoto = {
+                                id: 'photo_' + Date.now() + Math.random().toString(36).substr(2, 9),
+                                folderId: this.currentFolderId === 'all' ? null : this.currentFolderId,
+                                src: dataUrl,
+                                caption: '',
+                                date: new Date().toISOString(),
+                                isPublic: false
+                            };
+                            this.userData.photos.unshift(newPhoto); // Add to beginning
+                            
+                            processedCount++;
+                            if (processedCount === files.length) {
+                                this.saveUserData();
+                                this.renderPhotoGrid();
+                                this.renderFolderList(); // Update counts
+                                this.toast('照片上传完成', 'success');
+                                input.value = ''; // Reset input
+                            }
+                        });
+                    };
+                    reader.readAsDataURL(file);
+                });
+            },
+
+            handleAvatarChange: function(input) {
+                if (input.files && input.files[0]) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        this.resizeImage(e.target.result, 200, (dataUrl) => {
+                            this.currentUser.avatar = dataUrl;
+                            // Update in users list
+                            const userIndex = this.users.findIndex(u => u.username === this.currentUser.username);
+                            if (userIndex !== -1) {
+                                this.users[userIndex].avatar = dataUrl;
+                                this.saveUsers();
+                            }
+                            // Update UI
+                            document.getElementById('settings-avatar').src = dataUrl;
+                            document.getElementById('nav-avatar').src = dataUrl;
+                            this.toast('头像更新成功', 'success');
+                        });
+                    };
+                    reader.readAsDataURL(input.files[0]);
+                }
+            },
+
+            resizeImage: function(base64Str, maxWidth, callback) {
+                const img = new Image();
+                img.src = base64Str;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > maxWidth) {
+                        height *= maxWidth / width;
+                        width = maxWidth;
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    callback(canvas.toDataURL('image/jpeg', 0.7)); // Compress to JPEG 0.7 quality
+                };
+            },
+
+            /**
+             * Logic: Batch Actions
+             */
+            batchDelete: function() {
+                if (this.selectedPhotos.size === 0) {
+                    this.toast('请先选择照片', 'error');
+                    return;
+                }
+
+                this.showModal(
+                    '确认删除',
+                    `<p class="text-gray-600">确定要删除选中的 ${this.selectedPhotos.size} 张照片吗？此操作无法撤销。</p>`,
+                    () => {
+                        // Remove from user data
+                        this.userData.photos = this.userData.photos.filter(p => !this.selectedPhotos.has(p.id));
+                        
+                        // Remove from public data if present
+                        this.publicPhotos = this.publicPhotos.filter(p => !this.selectedPhotos.has(p.id));
+                        this.savePublicPhotos();
+
+                        this.saveUserData();
+                        this.selectedPhotos.clear();
+                        this.renderPhotoGrid();
+                        this.renderFolderList();
+                        this.closeModal();
+                        this.toast('删除成功', 'success');
+                    }
+                );
+            },
+
+            batchPublic: function(makePublic) {
+                if (this.selectedPhotos.size === 0) {
+                    this.toast('请先选择照片', 'error');
+                    return;
+                }
+
+                this.userData.photos.forEach(p => {
+                    if (this.selectedPhotos.has(p.id)) {
+                        const oldStatus = p.isPublic;
+                        p.isPublic = makePublic;
+                        
+                        // Update global public list
+                        if (makePublic && !oldStatus) {
+                            // Add to public
+                            this.publicPhotos.push({
+                                ...p,
+                                owner: this.currentUser.username
+                            });
+                        } else if (!makePublic && oldStatus) {
+                            // Remove from public
+                            this.publicPhotos = this.publicPhotos.filter(pub => pub.id !== p.id);
+                        }
+                    }
+                });
+
+                this.saveUserData();
+                this.savePublicPhotos();
+                this.selectedPhotos.clear();
+                this.renderPhotoGrid();
+                this.toast(makePublic ? '已公开到家庭相册' : '已取消公开', 'success');
+            },
+
+            toggleSinglePublic: function(photoId) {
+                const photo = this.userData.photos.find(p => p.id === photoId);
+                if (!photo) return;
+
+                photo.isPublic = !photo.isPublic;
+
+                if (photo.isPublic) {
+                    this.publicPhotos.push({
+                        ...photo,
+                        owner: this.currentUser.username
+                    });
+                    this.toast('已公开', 'success');
+                } else {
+                    this.publicPhotos = this.publicPhotos.filter(p => p.id !== photo.id);
+                    this.toast('已取消公开', 'info');
+                }
+
+                this.saveUserData();
+                this.savePublicPhotos();
+                this.renderPhotoGrid();
+            },
+
+            editCaption: function(photoId) {
+                const photo = this.userData.photos.find(p => p.id === photoId);
+                if (!photo) return;
+
+                this.showModal(
+                    '编辑备注',
+                    `<textarea id="photo-caption-input" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" rows="3" placeholder="写点什么...">${photo.caption || ''}</textarea>`,
+                    () => {
+                        const val = document.getElementById('photo-caption-input').value.trim();
+                        photo.caption = val;
+                        this.saveUserData();
+                        this.renderPhotoGrid();
+                        this.closeModal();
+                        this.toast('备注已保存', 'success');
+                    }
+                );
+            },
+
+            /**
+             * Logic: Data Export/Import (Sync)
+             */
+            exportData: function() {
+                const exportObj = {
+                    timestamp: Date.now(),
+                    users: this.users,
+                    publicPhotos: this.publicPhotos,
+                    // Export current user's specific data
+                    currentUserData: this.userData,
+                    currentUsername: this.currentUser.username
+                };
+
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObj));
+                const downloadAnchorNode = document.createElement('a');
+                downloadAnchorNode.setAttribute("href", dataStr);
+                downloadAnchorNode.setAttribute("download", `family_cloud_backup_${this.currentUser.username}_${new Date().toISOString().slice(0,10)}.json`);
+                document.body.appendChild(downloadAnchorNode); // required for firefox
+                downloadAnchorNode.click();
+                downloadAnchorNode.remove();
+                
+                this.toast('数据导出成功', 'success');
+            },
+
+            importData: function(input) {
+                if (input.files.length === 0) return;
+                
+                const file = input.files[0];
+                const reader = new FileReader();
+                
+                this.showModal(
+                    '导入数据',
+                    `<div class="flex items-center justify-center p-4">
+                        <div class="loader mr-3"></div>
+                        <span>正在解析数据...</span>
+                    </div>`,
+                    null, // No confirm button, auto process
+                    true // Hide cancel
+                );
+
+                reader.onload = (e) => {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        
+                        // Validation
+                        if (!data.users || !data.currentUserData) {
+                            throw new Error('无效的数据格式');
+                        }
+
+                        // Logic: 
+                        // 1. Update Users list (merge or replace? Let's replace for simplicity in this "sync" simulation)
+                        this.users = data.users;
+                        this.saveUsers();
+
+                        // 2. Update Public Photos
+                        this.publicPhotos = data.publicPhotos || [];
+                        this.savePublicPhotos();
+
+                        // 3. Update Current User Data
+                        // Check if the imported data belongs to the currently logged in user
+                        if (data.currentUsername === this.currentUser.username) {
+                            this.userData = data.currentUserData;
+                            this.saveUserData();
+                            this.toast('数据同步成功', 'success');
+                            this.navTo(this.currentView); // Refresh view
+                        } else {
+                            // If importing data from another user while logged in as someone else?
+                            // Usually, we just save the data to that user's slot in LS
+                            localStorage.setItem(this.STORAGE_KEYS.USER_DATA_PREFIX + data.currentUsername, JSON.stringify(data.currentUserData));
+                            this.toast(`已同步用户 ${data.currentUsername} 的数据`, 'success');
+                        }
+
+                        this.closeModal();
+
+                    } catch (err) {
+                        console.error(err);
+                        this.closeModal();
+                        this.toast('导入失败：文件格式错误', 'error');
+                    }
+                    input.value = '';
+                };
+                reader.readAsText(file);
+            },
+
+            /**
+             * Utilities: Toast & Modal
+             */
+            toast: function(message, type = 'info') {
+                const container = document.getElementById('toast-container');
+                const el = document.createElement('div');
+                
+                let bgClass = 'bg-gray-800';
+                let icon = 'fa-info-circle';
+                
+                if (type === 'success') { bgClass = 'bg-green-600'; icon = 'fa-check-circle'; }
+                if (type === 'error') { bgClass = 'bg-red-600'; icon = 'fa-exclamation-circle'; }
+                
+                el.className = `${bgClass} text-white px-4 py-3 rounded shadow-lg flex items-center gap-3 toast-enter pointer-events-auto min-w-[200px]`;
+                el.innerHTML = `<i class="fas ${icon}"></i><span class="text-sm font-medium">${message}</span>`;
+                
+                container.appendChild(el);
+                
+                setTimeout(() => {
+                    el.classList.remove('toast-enter');
+                    el.classList.add('toast-exit');
+                    el.addEventListener('animationend', () => el.remove());
+                }, 3000);
+            },
+
+            showModal: function(title, contentHtml, onConfirm, hideCancel = false) {
+                const overlay = document.getElementById('modal-overlay');
+                const content = document.getElementById('modal-content');
+                
+                content.innerHTML = `
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">${title}</h3>
+                    <div class="mb-6">${contentHtml}</div>
+                    <div class="flex justify-end gap-3">
+                        ${!hideCancel ? `<button onclick="app.closeModal()" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded transition">取消</button>` : ''}
+                        ${onConfirm ? `<button id="modal-confirm-btn" class="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded transition shadow-sm">确定</button>` : ''}
+                    </div>
+                `;
+                
+                overlay.classList.remove('hidden');
+                
+                if (onConfirm) {
+                    document.getElementById('modal-confirm-btn').onclick = onConfirm;
+                }
+            },
+
+            closeModal: function() {
+                document.getElementById('modal-overlay').classList.add('hidden');
+            },
+
+            setupEventListeners: function() {
+                // Close modal on click outside
+                document.getElementById('modal-overlay').addEventListener('click', (e) => {
+                    if (e.target.id === 'modal-overlay') this.closeModal();
+                });
+            }
+        };
+
+        // Initialize App on Load
+        window.addEventListener('DOMContentLoaded', () => {
+            app.init();
+        });
+
+    </script>
+</body>
+</html>
